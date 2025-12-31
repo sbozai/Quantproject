@@ -38,3 +38,5 @@ Output:
 A well-formatted, labelled chart showing performance over time, including cash in bank and cash invested.
 A percentage increase over time.
 A runnable, trained model that can be tested against an unseen dataset.
+
+BUILD
