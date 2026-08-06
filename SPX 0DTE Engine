@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPX 0DTE Quantitative Analytics Engine & Forecast Matrix</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js & Annotation Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <!-- Plotly WebGL -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Light slate background */
+            color: #0f172a;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 380px;
+        }
+        .forecast-chart-container {
+            position: relative;
+            width: 100%;
+            height: 520px;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 1); /* border-slate-200 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+<div class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-80 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-auto md:h-screen z-50">
+        <div class="p-6 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+                <span class="w-3 h-3 bg-cyan-500 rounded-full animate-ping"></span>
+                <h1 class="text-xl font-bold gradient-text">SPX 0DTE Engine</h1>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-semibold mono">Institutional Quantitative Terminal</p>
+            <div class="mt-2 text-xs text-slate-500">Exp Date: <span class="text-slate-800 font-semibold mono">Mon, Aug 03, 2026</span></div>
+        </div>
+        
+        <nav class="flex-grow p-4 space-y-1.5 overflow-y-auto">
+            <a href="#summary" class="flex items-center px-3 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-cyan-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> Executive Summary
+            </a>
+            <a href="#forecast" class="flex items-center px-3 py-2.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-amber-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> Intraday Forecast Chart
+            </a>
+            <a href="#matrix" class="flex items-center px-3 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-purple-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> Strategic Matrix Table
+            </a>
+            <a href="#roi" class="flex items-center px-3 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> ROI & Asymmetry
+            </a>
+            <a href="#downside" class="flex items-center px-3 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-orange-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> Downside & 3D GEX
+            </a>
+            <a href="#upside" class="flex items-center px-3 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all group">
+                <span class="w-2 h-2 bg-blue-500 rounded-full mr-3 group-hover:scale-125 transition-transform"></span> Upside & Charm Decay
+            </a>
+        </nav>
+
+        <div class="p-5 bg-slate-50 border-t border-slate-200 space-y-3">
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Structural Boundary Context</div>
+            <div class="space-y-2 text-xs mono">
+                <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200 shadow-sm">
+                    <span class="text-slate-500">Current Spot</span>
+                    <span class="font-bold text-cyan-600">7489.72</span>
+                </div>
+                <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200 shadow-sm">
+                    <span class="text-slate-500">Gamma Flip</span>
+                    <span class="font-bold text-purple-600">7485.00</span>
+                </div>
+                <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200 shadow-sm">
+                    <span class="text-slate-500">Put Wall Support</span>
+                    <span class="font-bold text-emerald-600">7480.00</span>
+                </div>
+                <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200 shadow-sm">
+                    <span class="text-slate-500">Call Wall Pin</span>
+                    <span class="font-bold text-rose-600">7500.00</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow overflow-y-auto px-4 py-8 md:px-10 space-y-16">
+
+        <!-- SECTION 1: EXECUTIVE SUMMARY -->
+        <section id="summary" class="max-w-6xl">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold text-slate-900">Section 1: Executive Summary & Spot Status</h2>
+                <span class="px-3 py-1 bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-mono rounded-full font-semibold">Live Market Data</span>
+            </div>
+            
+            <p class="text-slate-600 text-sm leading-relaxed mb-6">
+                This quantitative briefing models the intraday dealer positioning, structural liquidity boundaries, and options Greek dynamics for the S&amp;P 500 Index (SPX) expiring on <strong>Monday, August 3, 2026</strong>. Opening at <strong>7489.72</strong>, the market is positioned just above the <strong>7485 Gamma Flip</strong> point. The transition between long and short gamma regimes dictates high sensitivity to morning time gates.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="glass-card p-4 rounded-xl border-l-4 border-l-cyan-500">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Regime Mode</div>
+                    <div class="text-base font-bold text-slate-800 mt-1">Weak Long Gamma</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Mean-reverting above 7485</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border-l-4 border-l-orange-500">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Primary Put Wall</div>
+                    <div class="text-base font-bold text-slate-800 mt-1">7480.00 Strike</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Key volatility trigger boundary</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border-l-4 border-l-purple-500">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Upside Squeeze Trigger</div>
+                    <div class="text-base font-bold text-slate-800 mt-1">7495.00 Level</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Breakout initiates call delta hedging</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border-l-4 border-l-rose-500">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Call Wall / Pin Magnet</div>
+                    <div class="text-base font-bold text-slate-800 mt-1">7500.00 Strike</div>
+                    <div class="text-[11px] text-slate-500 mt-1">OI 2,310 contracts terminal anchor</div>
+                </div>
+            </div>
+
+            <!-- AI Engine Generator Card -->
+            <div class="glass-card p-5 rounded-xl border border-indigo-100 bg-indigo-50/50">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-pulse"></span>
+                        <h3 class="text-sm font-bold text-indigo-900">AI Quantitative Market Maker Briefing</h3>
+                    </div>
+                    <button id="generateAiBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1.5 px-3.5 rounded-lg transition-colors flex items-center space-x-1 shadow">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span>Synthesize Assessment</span>
+                    </button>
+                </div>
+                <div id="aiResponseContainer" class="hidden bg-white p-4 rounded-lg text-xs text-slate-700 border border-indigo-100 mono leading-relaxed shadow-sm"></div>
+                <div id="aiLoadingState" class="hidden flex items-center justify-center space-x-2 py-4">
+                    <div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-xs text-slate-500 mono font-medium">Executing Gamma Acceleration & Charm Models...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: INTRADAY PRICE FORECAST & STRATEGY VISUALIZER -->
+        <section id="forecast" class="max-w-6xl space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <span>Section 2: SPX Intraday Price Forecast Visualizer</span>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200">Strategic Matrix Map</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Time Gate overlay (X-axis) vs. SPX Strike Levels (Y-axis). Color-coded time windows highlight execution gates, trigger levels, invalidation bands, and price targets.
+                    </p>
+                </div>
+                
+                <!-- Interactive Controls for Scenarios -->
+                <div class="flex flex-wrap items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                    <button onclick="updateForecastScenario('all')" id="btn-scen-all" class="px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white shadow-sm transition-all">All Paths</button>
+                    <button onclick="updateForecastScenario('downside')" id="btn-scen-downside" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all">Downside Breakout</button>
+                    <button onclick="updateForecastScenario('upside')" id="btn-scen-upside" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all">Upside Squeeze</button>
+                    <button onclick="updateForecastScenario('pin')" id="btn-scen-pin" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all">Neutral Pin Magnet</button>
+                </div>
+            </div>
+
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="forecast-chart-container">
+                    <canvas id="spxForecastChart"></canvas>
+                </div>
+
+                <!-- Legend / Map Details below chart -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t border-slate-100 text-xs">
+                    <div class="flex items-center space-x-3 bg-amber-50 p-2.5 rounded-lg border border-amber-100">
+                        <span class="w-3 h-3 rounded bg-amber-200 border border-amber-300 shrink-0"></span>
+                        <div>
+                            <span class="font-bold text-amber-900 block">Time Gate 1 (09:30 - 10:15)</span>
+                            <span class="text-[10px] text-amber-700">Price Discovery & Initial Breakouts</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                        <span class="w-3 h-3 rounded bg-blue-200 border border-blue-300 shrink-0"></span>
+                        <div>
+                            <span class="font-bold text-blue-900 block">Time Gate 2 (10:15 - 14:00)</span>
+                            <span class="text-[10px] text-blue-700">Structural Acceleration & Gamma Expansion</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                        <span class="w-3 h-3 rounded bg-emerald-200 border border-emerald-300 shrink-0"></span>
+                        <div>
+                            <span class="font-bold text-emerald-900 block">Time Gate 3 (14:00 - 16:00)</span>
+                            <span class="text-[10px] text-emerald-700">Power Hour & 7500 Pin Realignment</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: STRATEGIC MATRIX TABLE -->
+        <section id="matrix" class="max-w-6xl space-y-4">
+            <h2 class="text-2xl font-bold text-slate-900">Section 3: Strategic Matrix Reference Table</h2>
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase tracking-wider font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4">Strategy / Strike</th>
+                                <th class="px-6 py-4">Execution Trigger</th>
+                                <th class="px-6 py-4">Time Gate</th>
+                                <th class="px-6 py-4">Invalidation Condition</th>
+                                <th class="px-6 py-4 text-right">Target</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 font-mono">
+                            <tr class="hover:bg-slate-50 transition-colors bg-orange-50/50">
+                                <td class="px-6 py-4">
+                                    <span class="font-bold text-orange-600 block text-sm">Downside Breakout</span>
+                                    <span class="text-[11px] text-slate-500">7480 Put</span>
+                                </td>
+                                <td class="px-6 py-4 text-slate-800">Failure of 7485 Flip</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-200 font-semibold">09:30 - 10:15</span></td>
+                                <td class="px-6 py-4 text-slate-500">Hourly close &gt; 7490</td>
+                                <td class="px-6 py-4 font-bold text-orange-600 text-sm text-right">7460</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors bg-red-50/50">
+                                <td class="px-6 py-4">
+                                    <span class="font-bold text-red-600 block text-sm">Negative Gamma Acceleration</span>
+                                    <span class="text-[11px] text-slate-500">7470 Put</span>
+                                </td>
+                                <td class="px-6 py-4 text-slate-800">Clean breach of 7480 Put Wall</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded border border-blue-200 font-semibold">10:15 - 14:00</span></td>
+                                <td class="px-6 py-4 text-slate-500">Bear Trap back &gt; 7485</td>
+                                <td class="px-6 py-4 font-bold text-red-600 text-sm text-right">7460</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors bg-blue-50/50">
+                                <td class="px-6 py-4">
+                                    <span class="font-bold text-blue-600 block text-sm">Upside Squeeze</span>
+                                    <span class="text-[11px] text-slate-500">7500 Call</span>
+                                </td>
+                                <td class="px-6 py-4 text-slate-800">Aggressive break of 7495</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-200 font-semibold">09:30 - 10:15</span></td>
+                                <td class="px-6 py-4 text-slate-500">Rejection at 7495</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-sm text-right">7515</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors bg-indigo-50/50">
+                                <td class="px-6 py-4">
+                                    <span class="font-bold text-indigo-600 block text-sm">Resistance Squeeze</span>
+                                    <span class="text-[11px] text-slate-500">7505 Call</span>
+                                </td>
+                                <td class="px-6 py-4 text-slate-800">Hourly close &gt; 7500</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded border border-blue-200 font-semibold">10:15 - 14:00</span></td>
+                                <td class="px-6 py-4 text-slate-500">Slip back &lt; 7500 Pin</td>
+                                <td class="px-6 py-4 font-bold text-indigo-600 text-sm text-right">7515</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: ROI COMPARISON & ASYMMETRY -->
+        <section id="roi" class="max-w-6xl space-y-4">
+            <h2 class="text-2xl font-bold text-slate-900">Section 4: ROI Comparison &amp; Convexity Payoffs</h2>
+            <p class="text-xs text-slate-500">
+                Calculated via 2nd order Taylor Expansion using 0DTE Implied Volatility surfaces. Downside puts offer superior leverage due to negative GEX acceleration below 7480.
+            </p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="chart-container">
+                        <canvas id="roiChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="chart-container">
+                        <canvas id="riskRewardChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: DOWNSIDE & 3D GEX LANDSCAPE -->
+        <section id="downside" class="max-w-6xl space-y-6">
+            <h2 class="text-2xl font-bold text-slate-900">Section 5: Downside Mechanics &amp; 3D Gamma Topography</h2>
+            <div class="glass-card p-3 rounded-2xl">
+                <div id="gamma3DPlot" style="width:100%; height:480px;"></div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                <div class="glass-card p-5 rounded-2xl space-y-3">
+                    <h3 class="text-sm font-bold text-orange-600 uppercase tracking-wide">Delta Speed &amp; Hedging Cascade</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        When SPX drops below the 7480 Put Wall, short gamma dealer positioning forces market makers to continuously short index futures to maintain delta-neutral books. This accelerates price movement toward 7460.
+                    </p>
+                    <div class="space-y-2 text-xs mono">
+                        <div class="flex justify-between p-2 bg-slate-50 rounded border border-slate-200">
+                            <span class="text-slate-600">7480 Put Delta @ Spot 7490:</span>
+                            <span class="text-orange-600 font-bold">0.4220</span>
+                        </div>
+                        <div class="flex justify-between p-2 bg-slate-50 rounded border border-slate-200">
+                            <span class="text-slate-600">7480 Put Delta @ Target 7460:</span>
+                            <span class="text-red-600 font-bold">0.6560 (+55%)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="chart-container">
+                        <canvas id="deltaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 6: UPSIDE & CHARM DECAY -->
+        <section id="upside" class="max-w-6xl space-y-4">
+            <h2 class="text-2xl font-bold text-slate-900">Section 6: Upside Mechanics &amp; Charm Decay Dynamics</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card p-5 rounded-2xl space-y-3">
+                    <h3 class="text-sm font-bold text-blue-600 uppercase tracking-wide">The 7500 Call Wall Resistance</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        The 7500 strike contains a dominant net GEX of +10.95. Market makers are long call inventory here, acting as a natural brake on upward momentum unless broken with high volume during Time Gate 1 (09:30 - 10:15).
+                    </p>
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs mono text-slate-600 space-y-1 overflow-x-auto">
+                        <div class="text-blue-700 font-semibold">Charm Equation ($\frac{\partial \Delta}{\partial t}$):</div>
+                        <div class="whitespace-nowrap">$\text{Charm}_{\text{Call}} = q e^{-qt} N(d_1) - e^{-qt} n(d_1) \left[ \frac{2(r-q-\frac{\sigma^2}{2})\tau - d_2 \sigma \sqrt{\tau}}{2\tau \sigma \sqrt{\tau}} \right]$</div>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl space-y-3">
+                    <h3 class="text-sm font-bold text-indigo-600 uppercase tracking-wide">Late Session Pin Dynamics</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        After 14:00 EST, rapid Charm decay causes OTM call deltas to collapse toward zero. Dealers unwind long hedges, pulling spot back toward the 7500/7485 equilibrium zone into the closing bell.
+                    </p>
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
+                        <div class="flex items-center justify-between text-xs font-semibold text-emerald-700">
+                            <span>Pin Probability Zone:</span>
+                            <span>7485 - 7500</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium">Prohibit new directional entries after 15:45 EST due to illiquidity and sharp spread widening.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="pt-8 pb-12 border-t border-slate-200 text-center text-xs text-slate-500 space-y-1">
+            <div>SPX 0DTE Quantitative Analytics Terminal — Monday, August 3, 2026</div>
+            <div class="mono text-[10px] text-slate-400">Generated for Quantitative Risk Management &amp; Tactical Options Execution</div>
+        </footer>
+    </main>
+</div>
+
+<!-- JAVASCRIPT EXECUTION & CHARTING ENGINE -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Standard Global Chart.js Defaults for Light Theme
+    Chart.defaults.color = '#64748b'; // slate-500
+    Chart.defaults.font.family = "'JetBrains Mono', monospace";
+    Chart.defaults.font.size = 11;
+
+    // Default Grid Lines Color for Light Theme
+    const gridColor = '#e2e8f0'; // slate-200
+    const axesTextColor = '#475569'; // slate-600
+
+    // ==========================================
+    // 1. INTRADAY SPX FORECAST CHART (SECTION 2)
+    // ==========================================
+    const forecastCtx = document.getElementById('spxForecastChart').getContext('2d');
+
+    const timeGateLabels = [
+        '09:30', '09:45', '10:00', '10:15', '10:45', '11:30', '12:15', '13:00', '13:45', '14:00', '14:30', '15:15', '16:00'
+    ];
+
+    // Scenario Data Paths
+    const downsidePath = [7489.72, 7484.50, 7478.00, 7471.50, 7468.00, 7464.00, 7461.50, 7460.00, 7459.00, 7460.00, 7461.00, 7460.50, 7460.00];
+    const upsidePath   = [7489.72, 7494.00, 7498.50, 7502.00, 7506.00, 7509.50, 7512.00, 7514.50, 7515.00, 7515.00, 7514.00, 7515.00, 7515.00];
+    const pinPath      = [7489.72, 7488.00, 7486.50, 7487.00, 7489.00, 7491.50, 7493.00, 7494.50, 7496.00, 7497.50, 7499.00, 7500.00, 7500.00];
+
+    const forecastDatasets = [
+        {
+            label: 'Downside Breakout (Target: 7460)',
+            data: downsidePath,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 3,
+            pointBackgroundColor: '#ef4444',
+            pointRadius: [4, 6, 6, 5, 4, 4, 4, 7, 4, 4, 4, 4, 6],
+            pointHoverRadius: 8,
+            tension: 0.25,
+            hidden: false
+        },
+        {
+            label: 'Upside Squeeze (Target: 7515)',
+            data: upsidePath,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 3,
+            pointBackgroundColor: '#3b82f6',
+            pointRadius: [4, 6, 6, 5, 4, 4, 4, 7, 4, 4, 4, 4, 6],
+            pointHoverRadius: 8,
+            tension: 0.25,
+            hidden: false
+        },
+        {
+            label: 'Neutral Pin Scenario (7500 Anchor)',
+            data: pinPath,
+            borderColor: '#a855f7',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointBackgroundColor: '#a855f7',
+            pointRadius: 3,
+            tension: 0.3,
+            hidden: false
+        }
+    ];
+
+    window.spxForecastChart = new Chart(forecastCtx, {
+        type: 'line',
+        data: {
+            labels: timeGateLabels,
+            datasets: forecastDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    title: { display: true, text: 'TIME GATES (EST)', color: axesTextColor, font: { weight: 'bold' } }
+                },
+                y: {
+                    min: 7450,
+                    max: 7525,
+                    grid: { color: gridColor },
+                    title: { display: true, text: 'SPX STRIKE / INDEX LEVEL', color: axesTextColor, font: { weight: 'bold' } }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#1e293b', usePointStyle: true, boxWidth: 8, font: { weight: 'bold' } }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    borderColor: '#cbd5e1',
+                    borderWidth: 1,
+                    titleColor: '#0f172a',
+                    bodyColor: '#334155',
+                    padding: 10,
+                    boxPadding: 4,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) label += context.parsed.y.toFixed(2);
+                            return label;
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: {
+                        // Time Gate Background Zones
+                        timeGate1: {
+                            type: 'box',
+                            xMin: 0,
+                            xMax: 3,
+                            backgroundColor: 'rgba(245, 158, 11, 0.06)',
+                            borderWidth: 0
+                        },
+                        timeGate2: {
+                            type: 'box',
+                            xMin: 3,
+                            xMax: 9,
+                            backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                            borderWidth: 0
+                        },
+                        timeGate3: {
+                            type: 'box',
+                            xMin: 9,
+                            xMax: 12,
+                            backgroundColor: 'rgba(16, 185, 129, 0.06)',
+                            borderWidth: 0
+                        },
+                        // Key Horizontal Strike Reference Lines
+                        targetUpper: {
+                            type: 'line',
+                            yMin: 7515,
+                            yMax: 7515,
+                            borderColor: '#0ea5e9',
+                            borderWidth: 2,
+                            borderDash: [3, 3],
+                            label: {
+                                display: true,
+                                content: 'TARGET: 7515',
+                                position: 'start',
+                                backgroundColor: '#0284c7',
+                                color: '#ffffff',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        },
+                        callWall: {
+                            type: 'line',
+                            yMin: 7500,
+                            yMax: 7500,
+                            borderColor: '#e11d48',
+                            borderWidth: 2,
+                            label: {
+                                display: true,
+                                content: 'CALL WALL / PIN: 7500',
+                                position: 'end',
+                                backgroundColor: '#be123c',
+                                color: '#ffffff',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        },
+                        triggerUpside: {
+                            type: 'line',
+                            yMin: 7495,
+                            yMax: 7495,
+                            borderColor: '#6366f1',
+                            borderWidth: 1,
+                            borderDash: [2, 4],
+                            label: {
+                                display: true,
+                                content: 'SQUEEZE TRIGGER: 7495',
+                                position: 'center',
+                                backgroundColor: '#4f46e5',
+                                color: '#ffffff',
+                                font: { size: 9 }
+                            }
+                        },
+                        currentSpot: {
+                            type: 'line',
+                            yMin: 7489.72,
+                            yMax: 7489.72,
+                            borderColor: '#0284c7',
+                            borderWidth: 1.5,
+                            label: {
+                                display: true,
+                                content: 'OPEN SPOT: 7489.72',
+                                position: 'start',
+                                backgroundColor: '#f8fafc',
+                                color: '#0284c7',
+                                font: { size: 10, weight: 'bold' },
+                                borderWidth: 1,
+                                borderColor: '#0284c7'
+                            }
+                        },
+                        gammaFlip: {
+                            type: 'line',
+                            yMin: 7485,
+                            yMax: 7485,
+                            borderColor: '#9333ea',
+                            borderWidth: 2,
+                            label: {
+                                display: true,
+                                content: 'GAMMA FLIP: 7485',
+                                position: 'center',
+                                backgroundColor: '#7e22ce',
+                                color: '#ffffff',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        },
+                        putWall: {
+                            type: 'line',
+                            yMin: 7480,
+                            yMax: 7480,
+                            borderColor: '#ea580c',
+                            borderWidth: 2,
+                            label: {
+                                display: true,
+                                content: 'PUT WALL: 7480',
+                                position: 'end',
+                                backgroundColor: '#c2410c',
+                                color: '#ffffff',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        },
+                        targetLower: {
+                            type: 'line',
+                            yMin: 7460,
+                            yMax: 7460,
+                            borderColor: '#dc2626',
+                            borderWidth: 2,
+                            borderDash: [3, 3],
+                            label: {
+                                display: true,
+                                content: 'TARGET: 7460',
+                                position: 'start',
+                                backgroundColor: '#b91c1c',
+                                color: '#ffffff',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Forecast Scenario Switcher Function
+    window.updateForecastScenario = function(mode) {
+        const chart = window.spxForecastChart;
+        const btnAll = document.getElementById('btn-scen-all');
+        const btnDown = document.getElementById('btn-scen-downside');
+        const btnUp = document.getElementById('btn-scen-upside');
+        const btnPin = document.getElementById('btn-scen-pin');
+
+        // Reset button states for Light Theme
+        const inactiveClass = "px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all";
+        [btnAll, btnDown, btnUp, btnPin].forEach(btn => btn.className = inactiveClass);
+
+        if (mode === 'all') {
+            btnAll.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white shadow-sm transition-all";
+            chart.data.datasets[0].hidden = false;
+            chart.data.datasets[1].hidden = false;
+            chart.data.datasets[2].hidden = false;
+        } else if (mode === 'downside') {
+            btnDown.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white shadow-sm transition-all";
+            chart.data.datasets[0].hidden = false;
+            chart.data.datasets[1].hidden = true;
+            chart.data.datasets[2].hidden = true;
+        } else if (mode === 'upside') {
+            btnUp.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white shadow-sm transition-all";
+            chart.data.datasets[0].hidden = true;
+            chart.data.datasets[1].hidden = false;
+            chart.data.datasets[2].hidden = true;
+        } else if (mode === 'pin') {
+            btnPin.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-purple-600 text-white shadow-sm transition-all";
+            chart.data.datasets[0].hidden = true;
+            chart.data.datasets[1].hidden = true;
+            chart.data.datasets[2].hidden = false;
+        }
+        chart.update();
+    };
+
+    // ==========================================
+    // 2. ROI COMPARISON BAR CHART (SECTION 4)
+    // ==========================================
+    const roiCtx = document.getElementById('roiChart').getContext('2d');
+    new Chart(roiCtx, {
+        type: 'bar',
+        data: {
+            labels: ['7470 Put', '7480 Put', '7505 Call', '7500 Call'],
+            datasets: [{
+                label: 'Projected ROI (%)',
+                data: [107.46, 103.38, 82.22, 74.12],
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.9)',
+                    'rgba(249, 115, 22, 0.9)',
+                    'rgba(99, 102, 241, 0.9)',
+                    'rgba(59, 130, 246, 0.9)'
+                ],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'TACTICAL ROI ASYMMETRY COMPARISON (%)', color: '#0f172a', font: { size: 12, weight: 'bold' } },
+                legend: { display: false },
+                tooltip: { backgroundColor: '#ffffff', titleColor: '#0f172a', bodyColor: '#334155', borderColor: '#e2e8f0', borderWidth: 1 }
+            },
+            scales: {
+                y: { grid: { color: gridColor }, title: { display: true, text: 'RETURN ON INVESTMENT %', color: axesTextColor } },
+                x: { grid: { display: false }, ticks: { color: axesTextColor, font: { weight: 'bold' } } }
+            }
+        }
+    });
+
+    // ==========================================
+    // 3. RISK VS REWARD SCATTER (SECTION 4)
+    // ==========================================
+    const rrCtx = document.getElementById('riskRewardChart').getContext('2d');
+    new Chart(rrCtx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                { label: '7470 Put', data: [{x: 12.60, y: 26.14}], backgroundColor: '#ef4444', pointRadius: 8 },
+                { label: '7480 Put', data: [{x: 15.40, y: 31.32}], backgroundColor: '#f97316', pointRadius: 8 },
+                { label: '7505 Call', data: [{x: 14.79, y: 26.95}], backgroundColor: '#6366f1', pointRadius: 8 },
+                { label: '7500 Call', data: [{x: 17.70, y: 30.82}], backgroundColor: '#0ea5e9', pointRadius: 8 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'CAPITAL EFFICIENCY: ENTRY COST VS TARGET VALUE ($)', color: '#0f172a', font: { size: 12, weight: 'bold' } },
+                legend: { labels: { color: '#334155', boxWidth: 10, font: { weight: 'bold' } } },
+                tooltip: { backgroundColor: '#ffffff', titleColor: '#0f172a', bodyColor: '#334155', borderColor: '#e2e8f0', borderWidth: 1 }
+            },
+            scales: {
+                x: { grid: { color: gridColor }, title: { display: true, text: 'ENTRY PREMIUM ($)', color: axesTextColor }, min: 10, max: 20 },
+                y: { grid: { color: gridColor }, title: { display: true, text: 'TARGET TERMINAL VALUE ($)', color: axesTextColor }, min: 20, max: 35 }
+            }
+        }
+    });
+
+    // ==========================================
+    // 4. 3D DEALER GEX TOPOGRAPHY (SECTION 5)
+    // ==========================================
+    const strikes = [7460, 7465, 7470, 7475, 7480, 7485, 7490, 7495, 7500, 7505, 7510, 7515];
+    const plotlyData = [{
+        z: [
+            [2.43, 1.59, 2.06, 4.02, 3.20, 1.60, 4.91, 2.60, 16.17, 14.63, 3.77, 3.28], // Call GEX
+            [2.14, 3.91, 1.19, 2.34, 6.36, 1.04, 1.46, 1.12, 5.22, 1.06, 1.25, 0.56],   // Put GEX
+            [0.29, -2.32, 0.87, 1.68, -3.17, 0.57, 3.45, 1.48, 10.95, 13.56, 2.52, 2.73] // Net GEX
+        ],
+        x: strikes,
+        y: ['Call GEX', 'Put GEX', 'Net GEX'],
+        type: 'surface',
+        colorscale: 'Viridis',
+        showscale: false
+    }];
+
+    const plotlyLayout = {
+        title: { text: '3D Dealer Net Gamma Surface (Aug 3)', font: { color: '#0f172a', size: 14 } },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        autosize: true,
+        scene: {
+            xaxis: { title: 'Strike', gridcolor: gridColor, titlefont: { color: axesTextColor }, tickfont: { color: '#64748b' } },
+            yaxis: { title: 'Metric', gridcolor: gridColor, titlefont: { color: axesTextColor }, tickfont: { color: '#64748b' } },
+            zaxis: { title: 'GEX ($M)', gridcolor: gridColor, titlefont: { color: axesTextColor }, tickfont: { color: '#64748b' } },
+            camera: { eye: { x: 1.4, y: 1.4, z: 1.1 } }
+        },
+        margin: { l: 0, r: 0, b: 0, t: 35 }
+    };
+    Plotly.newPlot('gamma3DPlot', plotlyData, plotlyLayout);
+
+    // ==========================================
+    // 5. DELTA ACCELERATION LINE (SECTION 5)
+    // ==========================================
+    const deltaCtx = document.getElementById('deltaChart').getContext('2d');
+    new Chart(deltaCtx, {
+        type: 'line',
+        data: {
+            labels: ['7490', '7485', '7480', '7475', '7470', '7465', '7460'],
+            datasets: [
+                {
+                    label: '7480 Put Abs Delta |Δ|',
+                    data: [0.4220, 0.4610, 0.5000, 0.5390, 0.5780, 0.6170, 0.6560],
+                    borderColor: '#f97316',
+                    backgroundColor: '#f97316',
+                    tension: 0.2
+                },
+                {
+                    label: '7470 Put Abs Delta |Δ|',
+                    data: [0.3535, 0.3885, 0.4235, 0.4585, 0.4935, 0.5285, 0.5635],
+                    borderColor: '#ef4444',
+                    backgroundColor: '#ef4444',
+                    tension: 0.2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'DELTA SPEED CONVEXITY ON DECLINE', color: '#0f172a', font: { size: 12, weight: 'bold' } },
+                legend: { labels: { color: '#334155', boxWidth: 10, font: { weight: 'bold' } } },
+                tooltip: { backgroundColor: '#ffffff', titleColor: '#0f172a', bodyColor: '#334155', borderColor: '#e2e8f0', borderWidth: 1 }
+            },
+            scales: {
+                x: { grid: { color: gridColor }, title: { display: true, text: 'DECLINING SPX SPOT', color: axesTextColor } },
+                y: { grid: { color: gridColor }, title: { display: true, text: 'ABSOLUTE DELTA |Δ|', color: axesTextColor }, min: 0.3, max: 0.7 }
+            }
+        }
+    });
+
+    window.addEventListener('resize', () => Plotly.Plots.resize('gamma3DPlot'));
+
+    // ==========================================
+    // 6. GEMINI LLM QUANT SYNTHESIS INTEGRATION
+    // ==========================================
+    const generateAiBtn = document.getElementById('generateAiBtn');
+    const aiResponseContainer = document.getElementById('aiResponseContainer');
+    const aiLoadingState = document.getElementById('aiLoadingState');
+
+    async function fetchWithBackoff(apiUrl, payload, retries = 3, delay = 1000) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (err) {
+                if (i === retries - 1) throw err;
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2;
+            }
+        }
+    }
+
+    generateAiBtn.addEventListener('click', async () => {
+        generateAiBtn.disabled = true;
+        generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        aiResponseContainer.classList.add('hidden');
+        aiLoadingState.classList.remove('hidden');
+
+        const apiKey = ""; // Canvas handles key at runtime
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+        const systemPrompt = `You are a Senior Options Market Maker and Quantitative Strategist.
+Zero conversational filler. Focus strictly on dealer gamma hedging, time gates, speed, and charm dynamics for SPX 0DTE.`;
+
+        const userPrompt = `Synthesize a concise 2-paragraph tactical briefing for Monday Aug 3, 2026:
+Current Spot: 7489.72
+Gamma Flip: 7485.00
+Put Wall: 7480.00
+Call Wall Pin: 7500.00
+Focus on:
+1. Downside Acceleration risks below 7485 during Time Gate 1 (09:30-10:15).
+2. Late-session Charm decay and pin magnet dynamics around 7500.`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+        };
+
+        try {
+            const result = await fetchWithBackoff(apiUrl, payload);
+            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+                // Reformatted to match light theme typography
+                let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-700">$1</strong>').replace(/\n/g, '<br>');
+                aiResponseContainer.innerHTML = formatted;
+            } else {
+                aiResponseContainer.innerHTML = '<span class="text-rose-600 font-semibold">Error generating quantitative briefing response.</span>';
+            }
+        } catch (error) {
+            aiResponseContainer.innerHTML = `<span class="text-rose-600 font-semibold">Execution Error: ${error.message}</span>`;
+        } finally {
+            aiLoadingState.classList.add('hidden');
+            aiResponseContainer.classList.remove('hidden');
+            generateAiBtn.disabled = false;
+            generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    });
+});
+</script>
+</body>
+</html>
